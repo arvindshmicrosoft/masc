@@ -8,6 +8,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+// import ml.combust.mleap.avro.ValueConverter;
+import ml.combust.mleap.avro.SchemaConverter;
+import ml.combust.mleap.runtime.frame.ArrayRow;
+import ml.combust.mleap.runtime.frame.DefaultLeapFrame;
+import ml.combust.mleap.runtime.frame.Row;
+import ml.combust.mleap.core.types.StructField;
+import ml.combust.mleap.core.types.StructType;
+
+import scala.collection.JavaConverters;
+import scala.collection.mutable.WrappedArray;
+
 import javax.el.ExpressionFactory;
 import javax.el.ValueExpression;
 
@@ -35,7 +46,7 @@ import org.apache.hadoop.io.Text;
 public class AvroRowEncoderIterator extends BaseMappingIterator {
   public static final String FILTER = "filter";
   public static final String COLUMN_PREFIX = "column.";
-  public static final String MLEAP_BUNDLE = "column.";
+  public static final String MLEAP_BUNDLE = "mleap.bundle";
 
   // root schema holding fields for each column family
   private Schema schema;
@@ -58,6 +69,11 @@ public class AvroRowEncoderIterator extends BaseMappingIterator {
   private Text columnQualifierText = new Text();
   private AvroContext expressionContext;
   private ValueExpression filterExpression;
+
+  private DefaultLeapFrame mleapDataFrame;
+  private Object[] mleapValues;
+  private Field[] mleapAvroFields;
+  private StructType mleapSchema;
 
   @Override
   protected void startRow(Text rowKey) throws IOException {
@@ -84,9 +100,7 @@ public class AvroRowEncoderIterator extends BaseMappingIterator {
     if (filterRecord(rowKey, record))
       return null;
 
-    // evaluate the filter against the record
-    // Debugging
-    // System.out.println(record);
+    executeMLeap(record);
 
     // serialize
     writer.write(record, encoder);
@@ -124,6 +138,16 @@ public class AvroRowEncoderIterator extends BaseMappingIterator {
     }
 
     return false;
+  }
+
+  private void executeMLeap(Record record) {
+    // surface data to MLeap dataframe
+    for (int i = 0; i < this.mleapAvroFields.length; i++)
+      this.mleapValues[i] = record.get(this.mleapAvroFields[i].pos());
+
+    // TODO: execute
+    mleapDataFrame.printSchema();
+    mleapDataFrame.show(System.out);
   }
 
   @Override
@@ -217,5 +241,26 @@ public class AvroRowEncoderIterator extends BaseMappingIterator {
   }
 
   private void initMLeapBundle(Map<String, String> options) {
+
+    List<Field> avroFields = new ArrayList<>();
+
+    List<StructField> mleapFields = new ArrayList<>();
+    for (Field field : schema.getFields()) {
+      if (field.schema().getType() == Type.RECORD)
+        continue;
+
+      avroFields.add(field);
+      mleapFields.add(SchemaConverter.avroToMleapField(field, null));
+    }
+
+    this.mleapAvroFields = avroFields.toArray(new Field[avroFields.size()]);
+    this.mleapSchema = StructType.apply(mleapFields).get();
+    this.mleapValues = new Object[this.mleapAvroFields.length];
+
+    mleapDataFrame = new DefaultLeapFrame(this.mleapSchema,
+        JavaConverters
+            .asScalaIteratorConverter(
+                Arrays.stream(new Row[] { new ArrayRow(WrappedArray.make(this.mleapValues)) }).iterator())
+            .asScala().toSeq());
   }
 }
