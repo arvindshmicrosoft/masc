@@ -20,27 +20,13 @@ import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.junit.Test;
 
-public class AvroRowTopLevelTest {
-	@Test
-	public void testSchemaGeneration() {
-		SchemaMappingField[] schemaMappingFields = new SchemaMappingField[] {
-				new SchemaMappingField("cf1", "cq1", "long", "v0"),
-				new SchemaMappingField("cf2", null, "double", "v1") };
-
-		Schema schema = AvroUtil.buildSchema(Arrays.asList(schemaMappingFields));
-
-		assertEquals(
-				"{\"type\":\"record\",\"name\":\"root\",\"fields\":[{\"name\":\"cf1\",\"type\":{\"type\":\"record\",\"name\":\"cf1\",\"fields\":[{\"name\":\"cq1\",\"type\":[\"null\",\"long\"],\"default\":null}]}},{\"name\":\"cf2\",\"type\":[\"null\",\"double\"],\"default\":null}]}",
-				schema.toString());
-	}
+public class AvroRowExpressionTest {
 
 	@Test
-	public void testTopLevelFields() throws IOException {
+	public void testExpressionColumn() throws IOException {
 		SortedMap<Key, Value> map = new TreeMap<>();
 		map.put(new Key("key1", "cf1", "cq1"), new Value("3"));
 		map.put(new Key("key1", "cf2", ""), new Value("abc"));
-
-		map.put(new Key("key2", "cf2"), new Value("def"));
 
 		SortedMapIterator parentIterator = new SortedMapIterator(map);
 		AvroRowEncoderIterator iterator = new AvroRowEncoderIterator();
@@ -49,12 +35,14 @@ public class AvroRowTopLevelTest {
 		options.put(AvroRowEncoderIterator.SCHEMA,
 				"[{\"cf\":\"cf1\",\"cq\":\"cq1\",\"t\":\"long\"},{\"cf\":\"cf2\",\"t\":\"STRING\"}]");
 
+		options.put("column.cfExpr.double", "${cf1.cq1 + 5.2}");
+
 		iterator.init(parentIterator, options, new DefaultIteratorEnvironment());
 		iterator.seek(new Range(), AvroTestUtil.EMPTY_SET, false);
 
 		SchemaMappingField[] schemaMappingFields = new SchemaMappingField[] {
-				new SchemaMappingField("cf1", "cq1", "long", "v0"),
-				new SchemaMappingField("cf2", null, "string", "v1") };
+				new SchemaMappingField("cf1", "cq1", "long", "v0"), new SchemaMappingField("cf2", null, "string", "v1"),
+				new SchemaMappingField("cfExpr", null, "double", null) };
 
 		Schema schema = AvroUtil.buildSchema(Arrays.asList(schemaMappingFields));
 
@@ -70,21 +58,7 @@ public class AvroRowTopLevelTest {
 
 		assertEquals(3L, cf1Record.get("cq1"));
 		assertEquals("abc", record.get("cf2").toString());
-
-		// ############################## ROW 2
-		iterator.next();
-
-		assertTrue(iterator.hasTop());
-		assertEquals("key2", iterator.getTopKey().getRow().toString());
-
-		// validate value
-		data = iterator.getTopValue().get();
-
-		record = AvroTestUtil.deserialize(data, schema);
-		cf1Record = (GenericRecord) record.get("cf1");
-
-		assertNull(cf1Record.get("cq1"));
-		assertEquals("def", record.get("cf2").toString());
+		assertEquals(8.2, record.get("cfExpr"));
 
 		// End of data
 		iterator.next();

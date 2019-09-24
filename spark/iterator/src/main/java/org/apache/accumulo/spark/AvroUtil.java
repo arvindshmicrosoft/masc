@@ -1,9 +1,6 @@
 package org.apache.accumulo.spark;
 
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import java.util.Collection;
 
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
@@ -49,7 +46,7 @@ public class AvroUtil {
 		return rootAssembler.name(columnFamily).type(columnFieldsAssembler.endRecord()).noDefault();
 	}
 
-	public static Schema buildSchema(SchemaMappingField[] schemaMappingFields) {
+	public static Schema buildSchema(Collection<SchemaMappingField> schemaMappingFields) {
 		// construct schema
 		SchemaBuilder.FieldAssembler<Schema> rootAssembler = SchemaBuilder.record("root").fields();
 

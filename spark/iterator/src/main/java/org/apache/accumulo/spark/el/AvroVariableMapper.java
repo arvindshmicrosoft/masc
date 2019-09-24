@@ -19,7 +19,7 @@ public class AvroVariableMapper extends VariableMapper {
 
 	private SchemaMappingField findSchemaMappingFieldByVariable(String variable) {
 		for (SchemaMappingField smf : schemaMappingFields)
-			if (smf.getFilterVariableName().equals(variable))
+			if (variable.equals(smf.getFilterVariableName()))
 				return smf;
 
 		return null;

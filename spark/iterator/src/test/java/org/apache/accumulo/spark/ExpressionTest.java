@@ -4,6 +4,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import java.util.Arrays;
+
 import javax.el.*;
 import junit.framework.TestCase;
 
@@ -28,7 +30,7 @@ public class ExpressionTest extends TestCase {
 				new SchemaMappingField("cf2", "cq2", "double", "v1"),
 				new SchemaMappingField("cf2", "cq3", "string", "v2") };
 
-		schema = AvroUtil.buildSchema(schemaMappingFields);
+		schema = AvroUtil.buildSchema(Arrays.asList(schemaMappingFields));
 
 		context = new AvroContext(schema, schemaMappingFields);
 	}
@@ -158,5 +160,14 @@ public class ExpressionTest extends TestCase {
 		ValueExpression expr = factory.createValueExpression(context, "${cf1.cq1 == 3}", boolean.class);
 		setRecordValues("key1", 3L, 2.0, "abc");
 		assertTrue((boolean) expr.getValue(context));
+	}
+
+	@Test
+	public void testColumnRemapping() {
+		ValueExpression expr = factory.createValueExpression(context, "${(cf1.cq1 + 1)/2.0}", Object.class);
+
+		setRecordValues("key1", 3L, 2.0, "abc");
+
+		assertEquals((3 + 1) / 2.0, expr.getValue(context));
 	}
 }
